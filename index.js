@@ -1,46 +1,33 @@
-const axios = require('axios').default;
-const cheerio = require('cheerio');
+const { 
+    getAverageSolarIncidenceFromPoint,
+    getAverageSolarIncidenceFromCep,
+} = require('./utils');
 
-let sum = 0;
-let qntStations = 0;
+const express = require('express');
+const app = express();
+const port = 8080;
 
-const latitude = process.argv[2];
-const latitude_dec = String(-latitude);
-const longitude = process.argv[3];
-const longitude_dec = String(-longitude);
-
-const options = {
-  method: 'POST',
-  url: 'http://www.cresesb.cepel.br/index.php',
-  headers: {
-    'Content-Type': 'application/x-www-form-urlencoded',
-  },
-  data: {
-    latitude_dec,
-    latitude,
-    hemi_lat: '0',
-    longitude_dec,
-    longitude,
-    formato: '1',
-    lang: 'pt',
-    section: 'sundata'
-  }
-};
-
-axios.request(options).then(function (response) {
-    const $ = cheerio.load(response.data);
-
-    $('#tb_sundata tr').each((index, element) => {
-        const indexValueDirt = $(element).find('td strong').html();
-        if (indexValueDirt) {
-            const indexValueClean = indexValueDirt.replace(',', '.');
-            sum += Number(indexValueClean);
-            ++qntStations;
-        }
-    });
+app.get('/', async (req, res) => {
+    try {
+        const { latitude, longitude } = req.query;
+        const averageSolarIncidence = await getAverageSolarIncidenceFromPoint(latitude, longitude);
+        res.send(averageSolarIncidence);
+    } catch (e) {
+        console.error(`Error at /. Reason: ${e.message}`);
+        res.status(e.response.status).end();
+    }
     
-    const average = (sum/qntStations).toFixed(2);
-    console.log(average);
-}).catch(function (error) {
-  console.error(error);
 });
+
+app.get('/cep/:cep', async (req, res) => {
+    const { cep } = req.params;
+    try {
+        const averageSolarIncidence = await getAverageSolarIncidenceFromCep(cep);
+        res.send(averageSolarIncidence);
+    } catch (e) {
+        console.error(`Error at /cep/:cep. Reason: ${e.message}`);
+        res.status(e.response.status).end();
+    }
+});
+
+app.listen(port);
